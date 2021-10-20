@@ -185,6 +185,240 @@
                 </section>
 
 
+                <section>
+
+                    <section><h1>Learn software engineering...</h1>
+                        <h1 class="fragment">Engineering software</h1>
+                    </section>
+
+                    <section><h1>Professors == product managers, senior software
+                        engineer</h1>
+                        <h2>Students == (junior) software engineer</h2>
+                    </section>
+                    
+                    <section
+                        data-background='https://live.staticflickr.com/5136/5489474407_8686dbf7d0_k_d.jpg'><h1>(Agile)
+                        Project-based
+                        learning</h1>
+                        <h1 class='fragment'><em>Flipped</em> class</h1>
+                        <h1 class='fragment'>In GitHub</h1>
+                        <aside class='notes'>Y, por supuesto, hacerlo en GitHub. El hecho de usar GitHub para las
+                            entregas ya, de por sí, tiene ciertas ventajas: notificación
+                            de las entregas, comentarios sobre la misma... Los PRs los
+                            usamos desde 2015, y <a
+                                                     href='https://github.com/JJ/IV16-17/pull/362'>aquí</a>, por
+                            ejemplo, el año siguiente se ve cómo se usan reviews, por
+                            ejemplo. Sin embargo, 0 tests</aside>
+                    </section>
+
+                    <section>
+                        <h1>If GitHub knows</h1>
+                        <h1 class='fragment'>Let GitHub test it</h1>
+                    </section>
+
+                    <section><h1>PR checks: Perl FTW</h1>
+                        <pre><code>my $repo = Git->repository ( Directory =&gt; '.' );
+my $diff = $repo-&gt;command('diff','HEAD^1','HEAD');
+my $diff_regex = qr/a\/proyectos\/hito-(\d)\.md/;
+my $github;
+ 
+SKIP: {
+  my ($this_hito) = ($diff =~ $diff_regex);
+  skip "No hay envío de proyecto", 5 unless defined $this_hito;  my @files = split(/diff --git/,$diff);
+  my ($diff_hito) = grep( /$diff_regex/, @files);
+  say "Tratando diff\n\t$diff_hito";
+  my @lines = split("\n",$diff_hito);
+  my @adds = grep(/^\+[^+]/,@lines);
+  is( $#adds, 0, "Añade sólo una línea");
+  my $url_repo;
+  if ( $adds[0] =~ /\(http/ ) {
+    ($url_repo) = ($adds[0] =~ /\((http\S+)\)/);
+  } else {
+    ($url_repo) = ($adds[0] =~ /^\+.+(http\S+)/s);
+  }</code></pre>
+                        <aside class='notes'>Initially it used scraping over the
+                            repo, now it uses the Github API through github actions</aside>
+                    </section>
+
+                    <section><h1>Test until it works</h1>
+                        <img src='img/travis.png' alt='imagen de travis'>
+                        <h1 class='fragment'>Big switch: learn while you submit</h1>
+                        <aside class='notes'>This is how ClassOps helps through
+                            the process of continuous improvement. It tells the
+                            students, in a non-ambiguous way, if objectives have been
+                            achieved or not. This helps them achieve their objectives
+                            by being informed where there are and where they should be.<aside>
+                    </section>
+
+
+                    <section><h1>Learning (objects) as code</h1>
+                        <pre class='fragment'><code>    my $prefix = $url_PaaS."/".$recurso->{'nombre'};
+    my $jsoner = new JSON::XS;
+    if ( $metodo eq 'PUT' ) {
+      ok( $recurso->{'IDs'}, "Se incluyen las IDs de los recursos enviados o devueltos" );
+      for my $id ( @{$recurso->{'IDs'}} ) {
+        my $URI = "$prefix/$id";
+        $response = $ua->put( $URI => json => $payload );
+        is( $response->res->code, 201, "Respuesta a la petición $metodo sobre $URI es correcta");
+        my $location = $response->res->headers->location;
+        if ( ok( $location, "«location» $location devuelto" ) ) {
+          my $get_URI = ( $location =~ /http/ )? $location : $url_PaaS.$location;
+          is( $ua->get($get_URI)->res->code, 200, "Se puede bajar el creado $id" );
+        }
+      }
+    } else { #... }</code></pre>
+                        <aside class='notes'>This checks if a PUT request to a
+                            deployed microservice works according to specs.</aside>
+                    </section>
+
+                    <section><h1><em>GitHub Actions</em>: big boost</h1>
+                        <pre><code>name: "Comprueba hitos y milestones"
+on:
+  pull_request:
+    paths:
+      - 'proyectos/hito-[1234567].md'
+      - '!objetivos/*.(md|org)'
+jobs:
+  obtain-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extrae URL del repositorio
+        uses: JJ/github-pr-contains-action@releases/v1
+        with:
+          github-token: ${{github.token}}
+          filesChanged: 1
+      - name: Comprueba hitos e issues
+        uses: JJ/repo-in-diff-gh-action@releases/v0
+        with:
+          github-token: ${{github.token}}
+          minMilestones: 3</code></pre>
+                        <aside class='notes'>En la primera parte miramos al
+                            diff; en la segunda es donde efectivamente comprobamos los
+                            milestones y demás. It's better, it's faster, and it's
+                            free for open source and public repos. So I'm lately
+                            moving everything done in Travis here.</aside>
+                    </section>
+
+                    <section><h1><a
+                                     href='https://github.com/JJ/repo-in-diff-gh-action'>With
+                        GitHub API</a></h1>
+                        <pre><code>const milestones = await github.issues.listMilestonesForRepo( { owner: user, repo: repo } )
+ if ( ! milestones.data.length ) {
+	core.setFailed("❌ There should be at least one milestone")
+ }
+ const minMilestones = +core.getInput('minMilestones')
+ if ( minMilestones && milestones.data.length < minMilestones ) {
+	core.setFailed( "❌ There should be more than " + minMilestones + " milestone(s)");
+ }
+ var totalIssues = 0
+ var totalClosedIssues = 0
+ milestones.data.forEach( async function( milestone ) {
+	totalIssues += milestone.open_issues + milestone.closed_issues
+	totalClosedIssues += milestone.closed_issues
+ })
+ console.log( "✅ There are " + totalIssues + "
+            issues in your milestones  and " + totalClosedIssues + "
+            closed issues ")</code></pre>
+
+                        <aside class='notes'>Escritos en typescript, tienes
+                            acceso a una serie de argumentos, pero lo más importante
+                            es que puedes acceder fácilmente al API. Cuando empecé
+                            con esto estaban en beta limitada, y la forma de
+                            documentarse era a base de mirar los fuentes de las
+                            actions y buscar en GitHub.</aside>
+                    </section>
+
+                    <section><h1>If GitHub knows...</h1>
+                        <img src='img/checks-20-21.png' alt='pop-up de
+                                  comprobaciones'>
+                        <aside class='notes'>Se rompe el límite de sólo poder
+                            corregir lo que uno puede físicamente hacer. Cosas que
+                            son imposibles, como comprobar que todos los issues se
+                            han cerrado con un commit (o PR), ahora se pueden hacer
+                            fácilmente. Y a escala: más estudiantes no te quitan
+                            tiempo, y te dejan centrarte en aconsejar al estudiante
+                            mejoras en su código o en la forma de presentarlo.</section>
+                            <section><h1>Speedier tests → better learning</h1>
+                                <img src='img/pr-speed.png' alt='Velocidad de los
+                                          tests'>
+                                <aside class='notes'>No sólo era más rápido, la
+                                    duración era más consistente. En travis es difícil que
+                                    algo tarde menos de 15 segundos, pero se llegaba a una
+                                    velocidad bastante buena. Again, this is what we're
+                                    looking for: learning is a continuous improvement
+                                    process, just like programming in general. But speed is
+                                    even more important here, which is why we need to speed
+                                    stuff up.</aside>
+                            </section>
+
+                            <section><h1><a href='https://github.com/JJ/IV-19-20/pull/895'>Checking
+                                to hell</a> and back</h1>
+                                <img src='img/checks-19-20.png' alt='Usando GH actions +
+                                          Travis'>
+                            </section>
+
+                            <section><h1>Docker FTW</h1>
+                                <pre><code>FROM perl:5.32-slim-threaded
+LABEL version="1.5" maintainer="JJ Merelo <jjmerelo@GMail.com>" perl5version="5.28"
+
+                                    # Set up dir and download modules
+                                    RUN chmod o+r /etc/resolv.conf
+                                    RUN mkdir /test && apt-get update \
+                                    && apt-get install -y git curl libio-socket-ssl-perl libnet-ssleay-perl gcc  \
+                                    && cpanm Test::More Test::Harness Git File::Slurper JSON TAP::Formatter::Color Term::ANSIColor Mojo::UserAgent Net::Ping YAML
+                                    RUN perl --version
+                                    VOLUME /test
+                                    WORKDIR /test
+
+                                    ENTRYPOINT prove -I/usr/lib -c</jjmerelo></code></pre>
+                                <aside class='notes'>El tener todos los módulos
+                                    instalados es un ahorro de los aproximadamente dos
+                                    minutos y medio que se tarda. No es una gran cosa en
+                                    un sistema de producción, pero en los estudiantes es
+                                    la diferencia entre enviar y largarse y enviar y
+                                    esperar a ver qué pasa → mejora en el aprendizaje.</aside>
+                            </section>
+
+                            <section><h1>2020 📅  <code>github script</code> + API v4 (GraphQL)</h1>
+                                <pre><code>const query = `query($owner:String!, $name:String!, $issue:Int!) {
+                            repository(name: $name , owner: $owner  ) {
+                              issue(number: $issue) {
+                                timelineItems(itemTypes: CLOSED_EVENT, last: 1) {
+                                  nodes {
+                                    ... on ClosedEvent {
+                                      closer {
+                                        __typename
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }`;</code></pre>
+                            </section>
+
+                            <section
+                                data-background='img/grafo-github-actions.png'><h1
+                                                                                   class='fragment'>Continuously improving ClassOps: ops
+                                graph</h1>
+                                <aside class='notes'>The quality and quantity of tests
+                                    needs to improve continuosly too... As well as the speed.</aside>
+                            </section>
+
+                            <section><h1>Because students are your customers.</h1>
+                                <img src='img/issue-abierto.png' alt='Contestando un
+                                          issue'>
+                                <aside class='notes'>En este caso, también tus
+                                    hijas... En todo caso, el resultado final no es el de
+                                    este issue, sino de otros dos que tenían diferentes
+                                    casuísticas. Finalmente, la solución con GraphQL fue la
+                                    más adecuada (y consecuencia de la ayuda de alguien en
+                                    Stackoverflow).</aside>
+                            </section>
+
+                </section>
+
+
                   <section>
     <h2>Credits</h2>
     <ul><li><a href='https://www.flickr.com/photos/tripu/1860870651/'>Console by tripu</a></li>
